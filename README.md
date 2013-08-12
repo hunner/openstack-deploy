@@ -69,7 +69,47 @@ Create a `README.md` file, initialize the repository, and set your GitHub reposi
 
 `git init
 git add README.md auth.conf fileserver.conf puppet.conf manifests/ modules/
-git remote add origin <your repository origin>
+git remote add origin <your repository origin>`
 
+## Connecting the puppet master to itself
+
+To illustrate configuration management with Puppet, we'll start by having the puppet server manage itself. 
+Initiate a puppet agent run:
+
+`puppet agent -t`
+
+You should get output that looks like this back:
+
+`Info: Retrieving plugin
+Info: Caching catalog for puppet.localdomain
+Info: Applying configuration version '1376343076'
+Info: Creating state file /var/lib/puppet/state/state.yaml
+Notice: Finished catalog run in 0.02 seconds`
+
+There are no configurations set up, so let's start by creating a base that installs an ntp server. Begin by
+creating a file `/etc/puppet/manifests/site.pp` with the following content:
+
+`import 'nodes.pp'`
+
+and a file `/etc/puppet/manifests/nodes.pp` with the content:
+
+`node 'puppet' {
+  include ::ntp
+}`
+
+Finally, install the ntp module available from the Puppet Labs Forge:
+
+`puppet module install puppet/ntp`
+
+Start the puppet agent run again, `puppet agent -t` and if all goes well, you should see quite a bit of
+output, and if the run was successful the `ntp` daemon should be running:
+
+`service ntpd status`
+
+Once you've verified that your configuration is working, push the changes up to github to save them remotely.
+
+`git add manifests/site.pp manifests/nodes.pp
+git commit
+git push`
 
 

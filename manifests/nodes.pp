@@ -1,0 +1,4 @@
+node 'puppet' {
+  include ::ntp
+}
+
