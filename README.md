@@ -425,3 +425,22 @@ this manually.
 yum update
 reboot
 ```
+
+Now's a good time to commit and push your changes up to GitHub.
+
+## 2.5 Installing memcached
+
+Update your control.pp file to include a memcache installation (the required module
+was installed as a puppet-openstack dependency).
+
+```
+class osdeploy::control {
+    class { 'osdeploy::common': }
+
+    class { 'memcached':
+        listen_ip => '127.0.0.1',
+        tcp_port  => '11211',
+        udp_port  => '11211',
+    }
+}
+```
