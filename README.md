@@ -129,7 +129,8 @@ the rules have been applied. Make a firewall directory within the manifests dire
 
 Then create two files, `/etc/puppet/external/master/manifests/firewall/pre.pp`:
 
-`# set up the firewall rules
+```
+# set up the firewall rules
 
 class master::firewall::pre {
   Firewall {
@@ -179,11 +180,13 @@ class master::firewall::pre {
     action => 'accept',
     port   => 5000,
   }
-}`
+}
+```
 
 and `/etc/puppet/external/master/manifests/firewall/post.pp`
 
-`class master::firewall::post {
+```
+class master::firewall::post {
   #6    REJECT     all  --  0.0.0.0/0            0.0.0.0/0           reject-with icmp-host-prohibited 
   firewall { '99999':
     action => 'reject',
@@ -199,11 +202,13 @@ and `/etc/puppet/external/master/manifests/firewall/post.pp`
   #Chain OUTPUT (policy ACCEPT)
   #num  target     prot opt source               destination   
 
-}`
+}
+```
 
 Update the `/etc/puppet/external/master/manifests/init.pp` to load the firewall rules:
 
-`# == Class: master
+```
+# == Class: master
 #
 # Configures the Puppet Master that manages an OpenStack deployment
 #
@@ -248,20 +253,25 @@ class master {
   class { 'master::firewall::pre': }
   class { 'master::firewall::post': }
 
-}`
+}
+```
 
 Update the `nodes.pp` file to include the new master configuration class.
 
-`node 'puppet' {
+```
+node 'puppet' {
   include ::ntp
   include ::master
-}`
+}
+```
 
 Once you've verified that your configuration is working, push the changes up to github to save them remotely.
 
-`git add manifests/site.pp manifests/nodes.pp external/.
+```
+git add manifests/site.pp manifests/nodes.pp external/.
 git commit
-git push`
+git push
+```
 
 
 # Chapter 2: Controller node Part I - memcached, RabbitMQ, MqSQL, Repositories
@@ -281,10 +291,12 @@ installed on the controller, run the command
 
 You should see a response that looks like this:
 
-`Info: Caching certificate for ca
+```
+Info: Caching certificate for ca
 Info: Creating a new SSL certificate request for control.localdomain
 Info: Certificate Request fingerprint (SHA256): 06:6C:A1:ED:0A:F3:40:F6:5C:D7:4E:D2:55:B3:AC:DC:50:CD:CC:BA:19:7D:11:09:B2:49:B4:32:B6:DC:59:91
-Exiting; no certificate found and waitforcert is disabled`
+Exiting; no certificate found and waitforcert is disabled
+```
 
 This means that the agent successfully connected, but it could not send or recieve any other configuration
 data as the puppet master had not yet signed this key. On the puppet server, list the waiting keys:
@@ -299,24 +311,30 @@ Sign the key:
 
 `puppet cert --sign control.localdomain`
 
-`Notice: Signed certificate request for control.localdomain
-Notice: Removing file Puppet::SSL::CertificateRequest control.localdomain at '/var/lib/puppet/ssl/ca/requests/control.localdomain.pem'`
+```
+Notice: Signed certificate request for control.localdomain
+Notice: Removing file Puppet::SSL::CertificateRequest control.localdomain at '/var/lib/puppet/ssl/ca/requests/control.localdomain.pem'
+```
 
 Now run the `puppet agent -t` on the control node again and verify that a connection was made, but that no 
 configuration for the node exists.
 
-`Error: Could not retrieve catalog from remote server: Error 400 on SERVER: Could not find default node or by name with 'control.localdomain, control' on node control.localdomain
+```
+Error: Could not retrieve catalog from remote server: Error 400 on SERVER: Could not find default node or by name with 'control.localdomain, control' on node control.localdomain
 Warning: Not using cache on failed catalog
-Error: Could not retrieve catalog; skipping run`
+Error: Could not retrieve catalog; skipping run
+```
 
 Update the node.pp file to add a new entry for `control.localdomain`, and install ntp.
 
-`node 'puppet' {
+```
+node 'puppet' {
   include ::ntp
 }
 
 node 'control.localdomain' {
   include ::ntp
-}`
+}
+```
 
 Rerun the agent on the control node, and verify that ntp is installed and running.
