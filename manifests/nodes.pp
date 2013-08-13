@@ -5,4 +5,5 @@ node 'puppet' {
 
 node 'control.localdomain' {
   include ::ntp
+  include ::osdeploy::control
 }

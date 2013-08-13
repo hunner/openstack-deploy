@@ -274,7 +274,7 @@ git push
 ```
 
 
-# Chapter 2: Controller node Part I - memcached, RabbitMQ, MqSQL, Repositories
+# Chapter 2: Controller node Part I - Repositories, memcached, RabbitMQ, MqSQL
 
 The next step in building out the OpenStack cluster is installing the basic services that OpenStack depends 
 upon. These are memcached for key-value storage, RabbitMQ for messaging, and MySQL to maintain the state 
@@ -338,3 +338,90 @@ node 'control.localdomain' {
 ```
 
 Rerun the agent on the control node, and verify that ntp is installed and running.
+
+## 2.2 Install the puppet-openstack modules
+
+From this point forward, we're going to rely upon the puppet-openstack modules. We'll be using some
+of the classes from the puppet-openstack module itself, mainly the helpers, but developing our
+own classes to build out the nodes as an exercise in how the base modules work. The puppet-openstack
+module itself is more of a set of working examples rather than an all-in-one deployment scheme.
+
+To get all of the modules and their dependencies, just type `puppet module install puppetlabs/puppet-openstack`
+
+```
+Notice: Preparing to install into /etc/puppet/modules ...
+Notice: Downloading from https://forge.puppetlabs.com ...
+Notice: Installing -- do not interrupt ...
+/etc/puppet/modules
+└─┬ puppetlabs-openstack (v2.1.0)
+  ├─┬ puppetlabs-cinder (v2.1.0)
+  │ ├── dprince-qpid (v1.0.2)
+  │ ├── puppetlabs-inifile (v1.0.0)
+  │ ├── puppetlabs-mysql (v0.9.0)
+  │ └─┬ puppetlabs-rabbitmq (v2.1.0)
+  │   └── puppetlabs-apt (v1.2.0)
+  ├── puppetlabs-glance (v2.1.0)
+  ├─┬ puppetlabs-horizon (v2.1.0)
+  │ ├─┬ puppetlabs-apache (v0.8.1)
+  │ │ └── ripienaar-concat (v0.2.0)
+  │ └── saz-memcached (v2.1.0)
+  ├── puppetlabs-keystone (v2.1.0)
+  ├─┬ puppetlabs-nova (v2.1.0)
+  │ └── duritong-sysctl (v0.0.1)
+  ├─┬ puppetlabs-quantum (v2.1.1)
+  │ └── puppetlabs-vswitch (v0.1.1)
+  └─┬ puppetlabs-swift (v2.1.0)
+    ├── puppetlabs-rsync (v0.1.0)
+    ├── puppetlabs-xinetd (v1.2.0)
+    └── saz-ssh (v1.2.0)
+```
+
+## 2.3 Create our OpenStack deployment module
+
+Like the `master` module, we're going to create our own OpenStack deployment module.
+
+```
+cd /etc/puppet/external
+puppet module generate hogepodge-osdeploy
+mv hogepodge-osdeploy osdeploy
+```
+
+## 2.4 Set up the module to install the latest Grizzly repository
+
+In your osdeploy module, create a new file called manifests/common.pp, which will hold configuration
+common to all of our OpenStack nodes. We'll begin by having this class install the Grizzly repositories.
+
+```
+class osdeploy::common {
+
+  class { 'openstack::repo': }
+
+}
+```
+
+Now, create a class that represents the controller node in a file `control.pp`
+
+```
+class osdeploy::control {
+    class { 'osdeploy::common': }
+}
+```
+
+Update the nodes.pp file to assign the `osdeploy::control` class to the controller node.
+
+```
+node 'control.localdomain' {
+  include ::ntp
+  include ::osdeploy::control
+}
+```
+
+Try the changes out on the controller node. Note that on RedHat the repositories provide
+updates to the kernel necessary for OpenStack Quantum networking to function propertly.
+Unfortunately, there's no good way to for updates and reboots, so it's a good time to do 
+this manually.
+
+```
+yum update
+reboot
+```
