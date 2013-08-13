@@ -127,7 +127,7 @@ the rules have been applied. Make a firewall directory within the manifests dire
 
 `mkdir /etc/puppet/external/master/manifests/firewall`
 
-Then create two files, `/etc/puppet/external/master/manifests/firewall/pre.pp`
+Then create two files, `/etc/puppet/external/master/manifests/firewall/pre.pp`:
 
 `# set up the firewall rules
 
