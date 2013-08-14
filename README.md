@@ -444,3 +444,46 @@ class osdeploy::control {
     }
 }
 ```
+
+## 2.6 Installing RabbitMQ
+
+### 2.6.1 Network dependency
+
+For this deployment, my system assumes the OpenStack management network is on 172.16.211.0/24
+(256 network addresses), on the eth1 device. My network configuration will be static, so I will 
+manage it with a Puppet network module. Your configuration may differ. 
+
+Install the `adrien/network` module:
+
+```
+puppet module install adrien/network
+```
+
+Add a new file to the module manifest, `adminnetwork.pp`:
+
+```
+class osdeploy::adminnetwork {
+  exec { 'restart eth1':
+    command     => '/sbin/ifdown eth1; /sbin/ifup eth1',
+  } 
+
+  network_config { 'eth1':
+    ensure      => present,
+    family      => 'inet',
+    ipaddress   => '172.16.211.10',
+    method      => 'static',
+    onboot      => 'true',
+    reconfigure => 'true',
+  }
+}
+```
+
+Add an entry to the `nodes.pp` file to run the network configuration if necessary.
+
+```
+node 'control.localdomain' {
+  include ::ntp
+  include ::osdeploy::adminnetwork
+  include ::osdeploy::control
+}
+```
