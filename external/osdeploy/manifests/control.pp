@@ -7,4 +7,6 @@ class osdeploy::control {
         udp_port  => '11211',
     }
 
+    class { 'nova::rabbitmq': }
+
 }

@@ -487,3 +487,57 @@ node 'control.localdomain' {
   include ::osdeploy::control
 }
 ```
+
+### 2.6.2 RabbitMQ
+
+For RabbitMQ, we'll install it using the nova::rabbitmq class. For security, we'll also take
+advantage of Hiera, the hierarchical database that works with Puppet to separate configuration
+parameters from module logic. In this instance, we'll want to set a custom RabbitMQ password
+and keep it out of our database.
+
+Begin by creating an `/etc/puppet/hiera.yaml` configuration file.
+
+```
+---
+:backends:
+  - yaml
+:yaml:
+  :datadir: /etc/puppet/hieradata
+:hierarchy:
+  - common
+```
+
+Next, populate the custom database with the entry for the RabbitMQ parameter. The file is
+`/etc/puppet/hieradata/common.yaml`
+
+```
+nova::rabbitmq::password: 'xyme-mita'
+```
+
+If you look at the nova module, you'll see in the rabbitmq.pp file that the parameter `password`
+to the class `nova::rabbitmq` defaults to `guest`. The hiera entry overrides this default
+parameter.
+
+Now add the `nova:rabbitmq` class to the `control.pp` file:
+
+```
+class osdeploy::control {
+  class { 'osdeploy::common': }
+
+    class { 'memcached':
+        listen_ip => '127.0.0.1',
+        tcp_port  => '11211',
+        udp_port  => '11211',
+    }
+
+    class { 'nova::rabbitmq': }
+
+}
+```
+
+Apply the configuration to your controller, and verify that RabbitMQ is running.
+
+```
+puppet agent -t
+service rabbitmq-server status
+```
