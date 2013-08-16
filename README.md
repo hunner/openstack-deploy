@@ -541,3 +541,63 @@ Apply the configuration to your controller, and verify that RabbitMQ is running.
 puppet agent -t
 service rabbitmq-server status
 ```
+
+## 2.7 MySQL
+
+The final step for the setup of the base services is to install MySQL on the controller node.
+This will just cover the initial setup, with the admin user and bind port. As services
+are added to the controller, the relevant databases will be created for this. In general,
+the openstack::db:mysql class can handle and entire deployment, but for our purposes
+we're going to add the OpenStack databases as needed.
+
+Begin by creating a db.pp file in your manifest. We'll create a database entry with a root
+password, and bind it to the OpenStack admin address.
+
+```
+class osdeploy::db (
+  mysql_root_password,
+  bind_address) { 
+  class { 'mysql::server': 
+  config_hash => { 
+    'root_password' => mysql_root_password, 
+    'bind_address' => bind_address, 
+  } 
+  enabled     => enabled, 
+  } 
+}
+```
+
+The database root password and bind address should be set in your hiera database.
+
+```
+nova::rabbitmq::password: 'xyme-mita'
+osdeploy::db::mysql_root_password: 'fi-de-hi'
+osdeploy::db::bind_address: '172.16.211.10'
+```
+
+Add the database class to your control class:
+
+```
+class osdeploy::control {
+  class { 'osdeploy::common': }
+  class { 'osdeploy::db': }
+
+    class { 'memcached':
+        listen_ip => '127.0.0.1',
+        tcp_port  => '11211',
+        udp_port  => '11211',
+    }
+
+    class { 'nova::rabbitmq': }
+
+}
+```
+
+Apply this on the control node. Note that the application will fail. You'll need to manually set your
+password on the mysql database. On the control node, execute the command 
+
+```
+mysqladmin -u root password fi-de-hi
+```
+
+To set the password (note it matches the entry in osdeploy).
