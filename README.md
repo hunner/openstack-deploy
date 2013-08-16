@@ -53,7 +53,9 @@ service:
 service puppetmaster start`
 
 This will start up your server with the default settings. We're assuming that the hostname of your puppet
-master is `puppet`. This can be set in the `/etc/sysconfig/network` file.
+master is `puppet`. This can be set in the `/etc/sysconfig/network` file. Don't use the version of Puppet supplied
+by EPEL. It is out of date, unsupported, and severely lacking in features. The puppet-openstack modules won't
+work with it.
 
 ## Setting up git as source control
 
@@ -551,19 +553,21 @@ the openstack::db:mysql class can handle and entire deployment, but for our purp
 we're going to add the OpenStack databases as needed.
 
 Begin by creating a db.pp file in your manifest. We'll create a database entry with a root
-password, and bind it to the OpenStack admin address.
+password, and bind it to the OpenStack admin address. We'll also disable the default
+accounts to improve the security of the database.
 
 ```
 class osdeploy::db (
-  mysql_root_password,
-  bind_address) { 
+  $mysql_root_password,
+  $bind_address) { 
   class { 'mysql::server': 
-  config_hash => { 
-    'root_password' => mysql_root_password, 
-    'bind_address' => bind_address, 
+    config_hash       => {
+      'root_password' => $mysql_root_password,
+      'bind_address'  => $bind_address,
+    },
   } 
-  enabled     => enabled, 
-  } 
+
+  class { 'mysql::server::account_security': }
 }
 ```
 
@@ -593,11 +597,14 @@ class osdeploy::control {
 }
 ```
 
-Apply this on the control node. Note that the application will fail. You'll need to manually set your
-password on the mysql database. On the control node, execute the command 
+Apply this on the control node. Note that you might need to manually set your
+password on the mysql database if this update fails. If so, on the control node, 
+execute the command 
 
 ```
 mysqladmin -u root password fi-de-hi
 ```
 
-To set the password (note it matches the entry in osdeploy).
+To set the password (note it matches the entry in osdeploy). Apply the configuration again, and 
+your setup should be complete.
+

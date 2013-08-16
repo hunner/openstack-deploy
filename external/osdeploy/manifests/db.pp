@@ -7,4 +7,6 @@ class osdeploy::db (
       'bind_address'  => $bind_address,
     },
   } 
+
+  class { 'mysql::server::account_security': }
 }
