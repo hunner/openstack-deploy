@@ -544,9 +544,100 @@ puppet agent -t
 service rabbitmq-server status
 ```
 
-## 2.7 MySQL
+## 2.7 Firewall
 
-The final step for the setup of the base services is to install MySQL on the controller node.
+Set up the firewall for the controller node. Begin by creating the `firewall/pre.pp`
+and `firewall/post.pp` files. These files will include a rule for RabbitMQ as well
+as well as the basic services
+
+```
+# set up the firewall rules
+
+class osdeploy::firewall::pre {
+  Firewall {
+    require => undef,
+  }   
+    
+  # Default firewall rules, based on the RHEL defaults
+  #Table: filter
+  #Chain INPUT (policy ACCEPT)
+  #num  target     prot opt source               destination         
+  #1    ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0           state RELATED,ESTABLISHED 
+  firewall { '00001 - related established':
+    proto  => 'all',
+    state  => ['RELATED', 'ESTABLISHED'],
+    action => 'accept',
+  } ->
+    #2    ACCEPT     icmp --  0.0.0.0/0            0.0.0.0/0           
+  firewall { '00002 - localhost':
+    proto  => 'icmp',
+    action => 'accept',
+    source => '127.0.0.1',
+  } ->  
+  #3    ACCEPT     all  --  0.0.0.0/0            0.0.0.0/0           
+  firewall { '00003 - localhost':
+    proto  => 'all',
+    action => 'accept',
+    source => '127.0.0.1',
+  } -> 
+  #4    ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0           state NEW tcp dpt:22 
+  firewall { '00022 - ssh': 
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => 22,
+  } -> 
+  #5    ACCEPT     tcp  --  0.0.0.0/0            0.0.0.0/0           state NEW tcp dpt:8140 
+  # RabbitMQ
+  firewall { '05672 - RabbitMQ':
+   proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => 5672,
+  }
+}
+```
+
+```
+class osdeploy::firewall::post {
+  #6    REJECT     all  --  0.0.0.0/0            0.0.0.0/0           reject-with icmp-host-prohibited 
+  firewall { '99999':
+    action => 'reject',
+    proto  => 'all',
+    reject => 'icmp-host-prohibited',
+    before => undef,
+  }
+
+  #Chain FORWARD (policy ACCEPT)
+  #num  target     prot opt source               destination         
+  #1    REJECT     all  --  0.0.0.0/0            0.0.0.0/0           reject-with icmp-host-prohibited 
+
+  #Chain OUTPUT (policy ACCEPT)
+  #num  target     prot opt source               destination   
+
+}
+```
+
+Add the firewall rules to the `control.pp` manifest. Note the addition of dependency
+chaining to make sure everything is applied in the proper order.
+
+```
+class osdeploy::control {
+  class { 'osdeploy::common': } ->
+  class { 'osdeploy::firewall::pre': } ->
+  class { 'memcached':
+      listen_ip => '127.0.0.1',
+      tcp_port  => '11211',
+      udp_port  => '11211',
+  } ->
+  class { 'nova::rabbitmq': } ->
+  class { 'osdeploy::firewall::post': } 
+}
+```
+
+## 2.8 MySQL
+
+The next step for the setup of the base services is to install MySQL on the controller node.
 This will just cover the initial setup, with the admin user and bind port. As services
 are added to the controller, the relevant databases will be created for this. In general,
 the openstack::db:mysql class can handle and entire deployment, but for our purposes
@@ -583,17 +674,16 @@ Add the database class to your control class:
 
 ```
 class osdeploy::control {
-  class { 'osdeploy::common': }
-  class { 'osdeploy::db': }
-
-    class { 'memcached':
-        listen_ip => '127.0.0.1',
-        tcp_port  => '11211',
-        udp_port  => '11211',
-    }
-
-    class { 'nova::rabbitmq': }
-
+  class { 'osdeploy::common': } ->
+  class { 'osdeploy::firewall::pre': } ->
+  class { 'osdeploy::db': } ->
+  class { 'memcached':
+      listen_ip => '127.0.0.1',
+      tcp_port  => '11211',
+      udp_port  => '11211',
+  } ->
+  class { 'nova::rabbitmq': } ->
+  class { 'osdeploy::firewall::post': } 
 }
 ```
 
@@ -606,5 +696,12 @@ mysqladmin -u root password fi-de-hi
 ```
 
 To set the password (note it matches the entry in osdeploy). Apply the configuration again, and 
-your setup should be complete.
+your setup database should be complete.
+
+
+# Chapter 3: Keystone
+
+Every other OpenStack project depends upon the Keystone as both an identity service
+and a service catalog for all of the OpenStack system.
+
 
