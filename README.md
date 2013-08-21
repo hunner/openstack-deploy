@@ -704,4 +704,256 @@ your setup database should be complete.
 Every other OpenStack project depends upon the Keystone as both an identity service
 and a service catalog for all of the OpenStack system.
 
+There are several parts of Keystone that need to be deployed. We'll start by 
+creating a `keystone.pp` file to contain the keystone deployment. Start
+with a class, with several parameters to control the particulars of our
+installation:
 
+```
+class osdeploy::keystone (
+  $keystone_admin_token,
+  $admin_email,
+  $admin_pass,
+  $admin_tenant = 'admin',
+  $keystone_public_address = '127.0.0.1',
+  $keystone_admin_address = '127.0.0.1',
+  $keystone_internal_address = '127.0.0.1',
+  $keystone_public_network = '0.0.0.0',
+  $keystone_private_network = '0.0.0.0',
+  $region = 'openstack',
+  $keystone_admin_user = 'keystone',
+  $keystone_db_host = 'localhost',
+  $keystone_db_user = 'keystone',
+  $keystone_db_password = 'keystone-password',
+  $keystone_db_name = 'keystone',
+  $keystone_db_allowed_hosts = false,) 
+{ 
+}
+```
+
+Keystone needs a public network that its API service runs on. In this instance,
+the public network is on `192.168.85.0/24`. Update the network configuration 
+in `adminnetwork.pp` to add this network and IP address at `192.168.85.10`.
+
+```
+class osdeploy::adminnetwork {
+
+  exec { 'restart eth1':
+    command     => '/sbin/ifdown eth1; /sbin/ifup eth1',
+  } 
+
+  network_config { 'eth1':
+    ensure      => present,
+    family      => 'inet',
+    ipaddress   => '172.16.211.10',
+    method      => 'static',
+    onboot      => 'true',
+    reconfigure => 'true',
+    notify      => Exec['restart eth1'],
+  }
+
+  exec { 'restart eth3':
+    command     => '/sbin/ifdown eth3; /sbin/ifup eth3',
+  } 
+
+  network_config { 'eth3':
+    ensure      => present,
+    family      => 'inet',
+    ipaddress   => '192.168.85.10',
+    method      => 'static',
+    onboot      => 'true',
+    reconfigure => 'true',
+    notify      => Exec['restart eth3'],
+  }
+}
+```
+
+Set up the firewall in our new keystone class to allow for public and private
+network access. The public port is 5000, the admin port is 35357.
+
+```
+  # public API access
+  firewall { '5000 - Keystone Public':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '5000',
+    source => $keystone_public_network,
+  }
+
+  # admin API access
+  firewall { '35357 - Keystone Admin':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '35357',
+    source => $keystone_private_network,
+  }
+```
+
+Next, keystone needs to have its database connection configured:
+
+```
+  $keystone_sql_connection = "mysql://$keystone_db_user:$keystone_db_password@$keystone_db_host/$keystone_db_name"
+
+  class { 'keystone::db::mysql':
+    user          => $keystone_db_user,
+    password      => $keystone_db_password,
+    dbname        => $keystone_db_dbname,
+    allowed_hosts => $keystone_db_allowed_hosts,
+  } ->
+```
+
+Note the dependency arrow, what follows will be the keystone installation, and we
+need to enforce the installation order. What follows next is the keystone
+service installation:
+
+```
+  class { '::keystone':
+    admin_token    => $keystone_admin_token,
+    sql_connection => $keystone_sql_connection,
+  } ->
+```
+
+Once the service is set up, the keystone admin role can be created and
+keystone can add itself to its service catalog:
+
+```
+  class { 'keystone::roles::admin': 
+    email        => $admin_email,
+    password     => $admin_pass,
+    admin_tenant => $admin_tenant,
+  } ->
+
+  class { 'keystone::endpoint':
+    public_address   => $keystone_public_address,
+    admin_address    => $keystone_admin_address,
+    internal_address => $keystone_internal_address,
+    region           => $region,
+  }
+```
+
+The entire configuration manifest looks like this:
+
+```
+class osdeploy::keystone (
+  $keystone_admin_token,
+  $admin_email,
+  $admin_pass,
+  $admin_tenant = 'admin',
+  $keystone_public_address = '127.0.0.1',
+  $keystone_admin_address = '127.0.0.1',
+  $keystone_internal_address = '127.0.0.1',
+  $keystone_public_network = '0.0.0.0',
+  $keystone_private_network = '0.0.0.0',
+  $region = 'openstack',
+  $keystone_admin_user = 'keystone',
+  $keystone_db_host = 'localhost',
+  $keystone_db_user = 'keystone',
+  $keystone_db_password = 'keystone-password',
+  $keystone_db_name = 'keystone',
+  $keystone_db_allowed_hosts = false,) 
+{ 
+
+
+  # public API access
+  firewall { '5000 - Keystone Public':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '5000',
+    source => $keystone_public_network,
+  } 
+
+  # admin API access
+  firewall { '35357 - Keystone Admin':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '35357',
+    source => $keystone_private_network,
+  }
+
+  $keystone_sql_connection = "mysql://$keystone_db_user:$keystone_db_password@$keystone_db_host/$keystone_db_name"
+
+  class { 'keystone::db::mysql':
+    user          => $keystone_db_user,
+    password      => $keystone_db_password,
+    dbname        => $keystone_db_dbname,
+    allowed_hosts => $keystone_db_allowed_hosts,
+  } ->
+
+  class { '::keystone':
+    admin_token    => $keystone_admin_token,
+    sql_connection => $keystone_sql_connection,
+  } ->
+
+  class { 'keystone::roles::admin': 
+    email        => $admin_email,
+    password     => $admin_pass,
+    admin_tenant => $admin_tenant,
+  } ->
+
+  class { 'keystone::endpoint':
+    public_address   => $keystone_public_address,
+    admin_address    => $keystone_admin_address,
+    internal_address => $keystone_internal_address,
+    region           => $region,
+  }
+}
+```
+
+To make this configuration work for your environment, configure
+the hiera database in `heiradata/common.yaml` to have your custom variables.
+
+```
+nova::rabbitmq::password: 'xyme-mita'
+osdeploy::db::mysql_root_password: 'fi-de-hi'
+osdeploy::db::bind_address: '172.16.211.10'
+
+osdeploy::keystone::keystone_admin_token: 'pala-vif'
+osdeploy::keystone::admin_email: 'chris.hoge@puppetlabs.com'
+osdeploy::keystone::admin_pass: 'quu-rhyw'
+osdeploy::keystone::keystone_public_address: '192.168.85.10'
+osdeploy::keystone::keystone_admin_address: '172.16.211.10'
+osdeploy::keystone::keystone_internal_address: '192.168.85.10'
+osdeploy::keystone::keystone_public_network: '192.168.85.0/24'
+osdeploy::keystone::keystone_private_network: '172.16.211.0/24'
+osdeploy::keystone::keystone_db_password: 'rhof-nibs'
+osdeploy::keystone::keystone_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
+```
+
+Finally, update the `control.pp` configuration to add the keystone deployment:
+
+```
+class osdeploy::control {
+  class { 'osdeploy::common': } ->
+  class { 'osdeploy::firewall::pre': } ->
+  class { 'osdeploy::db': } ->
+  class { 'memcached':
+      listen_ip => '127.0.0.1',
+      tcp_port  => '11211',
+      udp_port  => '11211',
+  } ->
+  class { 'nova::rabbitmq': } ->
+  class { 'osdeploy::keystone': } ->
+  class { 'osdeploy::firewall::post': } 
+}
+```
+
+Once you apply the configuration, you can run keystone through its paces:
+
+```
+[root@control ~]# service openstack-keystone status
+keystone (pid  20117) is running...
+[root@control ~]# keystone --os-token pala-vif --os-endpoint http://172.16.211.10:35357/v2.0 endpoint-list
++----------------------------------+-----------+--------------------------------+--------------------------------+---------------------------------+----------------------------------+
+|                id                |   region  |           publicurl            |          internalurl           |             adminurl            |            service_id            |
++----------------------------------+-----------+--------------------------------+--------------------------------+---------------------------------+----------------------------------+
+| b6a97a323e084741bf90fbfb59a8692d | openstack | http://192.168.85.10:5000/v2.0 | http://192.168.85.10:5000/v2.0 | http://172.16.211.10:35357/v2.0 | 8f2d22b00ed24adfa410b9e9d771461b |
++----------------------------------+-----------+--------------------------------+--------------------------------+---------------------------------+----------------------------------+
+[root@control ~]# keystone --os-token pala-vif --os-endpoint http://172.16.211.10:5000/v2.0 endpoint-list
+[Errno 113] No route to host
+[root@control ~]# curl http://192.168.85.10:5000
+{"versions": {"values": [{"status": "stable", "updated": "2013-03-06T00:00:00Z", "media-types": [{"base": "application/json", "type": "application/vnd.openstack.identity-v3+json"}, {"base": "application/xml", "type": "application/vnd.openstack.identity-v3+xml"}], "id": "v3.0", "links": [{"href": "http://localhost:5000/v3/", "rel": "self"}]}, {"status": "stable", "updated": "2013-03-06T00:00:00Z", "media-types": [{"base": "application/json", "type": "application/vnd.openstack.identity-v2.0+json"}, {"base": "application/xml", "type": "application/vnd.openstack.identity-v2.0+xml"}], "id": "v2.0", "links": [{"href": "http://localhost:5000/v2.0/", "rel": "self"}, {"href": "http://docs.openstack.org/api/openstack-identity-service/2.0/content/", "type": "text/html", "rel": "describedby"}, {"href": "http://docs.openstack.org/api/openstack-identity-service/2.0/identity-dev-guide-2.0.pdf", "type": "application/pdf", "rel": "describedby"}]}]}}[root@control ~]#
+```

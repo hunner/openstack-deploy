@@ -1,3 +1,14 @@
 nova::rabbitmq::password: 'xyme-mita'
 osdeploy::db::mysql_root_password: 'fi-de-hi'
 osdeploy::db::bind_address: '172.16.211.10'
+
+osdeploy::keystone::keystone_admin_token: 'pala-vif'
+osdeploy::keystone::admin_email: 'chris.hoge@puppetlabs.com'
+osdeploy::keystone::admin_pass: 'quu-rhyw'
+osdeploy::keystone::keystone_public_address: '192.168.85.10'
+osdeploy::keystone::keystone_admin_address: '172.16.211.10'
+osdeploy::keystone::keystone_internal_address: '192.168.85.10'
+osdeploy::keystone::keystone_public_network: '192.168.85.0/24'
+osdeploy::keystone::keystone_private_network: '172.16.211.0/24'
+osdeploy::keystone::keystone_db_password: 'rhof-nibs'
+osdeploy::keystone::keystone_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']

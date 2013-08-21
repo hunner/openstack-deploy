@@ -14,4 +14,18 @@ class osdeploy::adminnetwork {
     notify      => Exec['restart eth1'],
   }
 
+  exec { 'restart eth3':
+    command     => '/sbin/ifdown eth3; /sbin/ifup eth3',
+  } 
+
+  network_config { 'eth3':
+    ensure      => present,
+    family      => 'inet',
+    ipaddress   => '192.168.85.10',
+    method      => 'static',
+    onboot      => 'true',
+    reconfigure => 'true',
+    notify      => Exec['restart eth3'],
+  }
+
 }
