@@ -645,7 +645,8 @@ we're going to add the OpenStack databases as needed.
 
 Begin by creating a db.pp file in your manifest. We'll create a database entry with a root
 password, and bind it to the OpenStack admin address. We'll also disable the default
-accounts to improve the security of the database.
+accounts to improve the security of the database. The firewall needs to be opened up
+to allow MySQL access on the admin network.
 
 ```
 class osdeploy::db (
@@ -659,6 +660,16 @@ class osdeploy::db (
   } 
 
   class { 'mysql::server::account_security': }
+
+  # MySQL
+  firewall { '03306 - MySQL':
+   proto   => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '3306',
+    source => '172.16.211.0/24',
+  }
+  
 }
 ```
 
