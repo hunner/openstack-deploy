@@ -742,6 +742,19 @@ class osdeploy::keystone (
 }
 ```
 
+An important note: Keystone is the authentication and authorization service. Its
+public interface should be running over `https`. This configuration runs keystone
+over http, meaning all of your passwords and authentication tokens will be sent over
+plain text. Currently setting up https (which requires certificates) is out of the
+scope of this document. It is an important issue, however, and will be addressed
+in a future revision.
+
+Other items no note in the configuration settings. The `$keystone_admin_token` is
+not attached to any particular user, and gives complete administrative control
+over Keystone. It's used to bootstrap users and catalogs into the system. Needless to
+say, it must be kept secret. We'll set it using hiera, and this underscores the
+importance of making sure your hiera data source is secure.
+
 Keystone needs a public network that its API service runs on. In this instance,
 the public network is on `192.168.85.0/24`. Update the network configuration 
 in `adminnetwork.pp` to add this network and IP address at `192.168.85.10`.
@@ -780,7 +793,12 @@ class osdeploy::adminnetwork {
 ```
 
 Set up the firewall in our new keystone class to allow for public and private
-network access. The public port is 5000, the admin port is 35357.
+network access. The public port is 5000, the admin port is 35357. The keystone
+service is going to be running on `0.0.0.0`, which means it will be available
+on all network devices. However, we want to enforce network segmentation, so
+these firewall rules will enforce that public traffic be routed through the
+public network interface, and admin traffic will be routed over the admin
+network interface.
 
 ```
   # public API access
@@ -968,3 +986,8 @@ keystone (pid  20117) is running...
 [root@control ~]# curl http://192.168.85.10:5000
 {"versions": {"values": [{"status": "stable", "updated": "2013-03-06T00:00:00Z", "media-types": [{"base": "application/json", "type": "application/vnd.openstack.identity-v3+json"}, {"base": "application/xml", "type": "application/vnd.openstack.identity-v3+xml"}], "id": "v3.0", "links": [{"href": "http://localhost:5000/v3/", "rel": "self"}]}, {"status": "stable", "updated": "2013-03-06T00:00:00Z", "media-types": [{"base": "application/json", "type": "application/vnd.openstack.identity-v2.0+json"}, {"base": "application/xml", "type": "application/vnd.openstack.identity-v2.0+xml"}], "id": "v2.0", "links": [{"href": "http://localhost:5000/v2.0/", "rel": "self"}, {"href": "http://docs.openstack.org/api/openstack-identity-service/2.0/content/", "type": "text/html", "rel": "describedby"}, {"href": "http://docs.openstack.org/api/openstack-identity-service/2.0/identity-dev-guide-2.0.pdf", "type": "application/pdf", "rel": "describedby"}]}]}}[root@control ~]#
 ```
+
+This is a good opportunity to take a look at `/etc/keystone/keystone.conf` that's been 
+generated on the controller node. You can get a sense of what puppet configured through 
+the modules, and the possibilities of how you can change the configuration to enable 
+other features.
