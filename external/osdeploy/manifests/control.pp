@@ -9,5 +9,6 @@ class osdeploy::control {
   } ->
   class { 'nova::rabbitmq': } ->
   class { 'osdeploy::keystone': } ->
+  class { 'osdeploy::glance': } ->
   class { 'osdeploy::firewall::post': } 
 }

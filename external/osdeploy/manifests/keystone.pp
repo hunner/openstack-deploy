@@ -19,7 +19,7 @@ class osdeploy::keystone (
 
 
   # public API access
-  firewall { '5000 - Keystone Public':
+  firewall { '05000 - Keystone Public':
     proto  => 'tcp',
     state  => ['NEW'],
     action => 'accept',

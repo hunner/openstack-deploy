@@ -12,3 +12,12 @@ osdeploy::keystone::keystone_public_network: '192.168.85.0/24'
 osdeploy::keystone::keystone_private_network: '172.16.211.0/24'
 osdeploy::keystone::keystone_db_password: 'rhof-nibs'
 osdeploy::keystone::keystone_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
+
+osdeploy::glance::glance_user_password: 'quu-rhyw'
+osdeploy::glance::glance_public_address: '192.168.85.10'
+osdeploy::glance::glance_admin_address: '172.16.211.10'
+osdeploy::glance::glance_internal_address: '192.168.85.10'
+osdeploy::glance::glance_public_network: '192.168.85.0/24'
+osdeploy::glance::glance_private_network: '172.16.211.0/24'
+osdeploy::glance::glance_db_password: 'rhof-nibs'
+osdeploy::glance::glance_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']

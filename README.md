@@ -991,3 +991,17 @@ This is a good opportunity to take a look at `/etc/keystone/keystone.conf` that'
 generated on the controller node. You can get a sense of what puppet configured through 
 the modules, and the possibilities of how you can change the configuration to enable 
 other features.
+
+# Chapter 4: Glance
+
+Now we'll move on to installing Glance on the controller node. For this deployment
+we'll be using a basic filesystem-backed storage system. Normally you would
+want to use a more robust image storage backend, such as Swift (which gives
+you large object storage with redundancy across availablity zones) or Ceph (which
+give you redundant block and object storage).
+
+The configuration file for Glance is similar to Keystone:
+
+```
+
+```
