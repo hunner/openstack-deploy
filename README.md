@@ -1319,3 +1319,13 @@ API, which redirects the calls to the correct glance server. If you run into an 
 error, you might need to do the puppet run again to make sure that the glance service
 user has been created.
 
+# Chapter 5 Network Node: Quantum/Neutron
+
+# Chapter 6 Nova API and Scheduler
+
+# Chapter 7 Compute Node: Nova Compute and Quantum Agents
+
+# Chapter 8 Cinder: Controller API and Scheduler, Compute Volume
+
+# Chapter 9 Horizon
+
