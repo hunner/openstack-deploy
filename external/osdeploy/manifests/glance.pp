@@ -22,6 +22,15 @@ class osdeploy::glance (
     source => $glance_public_network,
   }
 
+  # private API access
+  firewall { '09292 - Glance Private':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '9292',
+    source => $glance_private_network,
+  }
+
   # admin API access
   firewall { '09191 - Glance Private':
     proto  => 'tcp',
@@ -61,6 +70,8 @@ class osdeploy::glance (
     keystone_tenant   => 'services',
     keystone_user     => 'glance',
     sql_connection    => $glance_sql_connection,
+    verbose          => true,
+    debug            => true,
   }
 
   class { 'glance::registry':
@@ -69,6 +80,8 @@ class osdeploy::glance (
     auth_host         => $keystone_admin_endpoint,
     keystone_tenant   => 'services',
     keystone_user     => 'glance',
+    verbose          => true,
+    debug            => true,
   } 
 
   class { 'glance::backend::file': }

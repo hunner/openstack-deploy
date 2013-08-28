@@ -1138,7 +1138,9 @@ class osdeploy::glance (
 ) {
 ```
 
-Next, the firewall setup to open the private and public APIs up.
+Next, the firewall setup to open the private and public APIs up. The API
+server uses the same port for both public and private access, so both
+addresses need to be exposed through the firewall.
 
 ```
   # public API access
@@ -1149,6 +1151,16 @@ Next, the firewall setup to open the private and public APIs up.
     port   => '9292',
     source => $glance_public_network,
   }
+
+  # private API access
+  firewall { '09292 - Glance Private':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '9292',
+    source => $glance_private_network,
+  }
+
 
   # admin API access
   firewall { '09191 - Glance Private':
@@ -1295,4 +1307,15 @@ Authentication required
 </html>
 ```
 
+Test the service with the test user:
+
+```
+glance  --os-username test --os-tenant-name test --os-password abc123  --os-auth-url http://192.168.85.10:5000/v2.0 image-list
+
+```
+
+There should be no output. Note that the glance client connects to the keystone public
+API, which redirects the calls to the correct glance server. If you run into an auth
+error, you might need to do the puppet run again to make sure that the glance service
+user has been created.
 
