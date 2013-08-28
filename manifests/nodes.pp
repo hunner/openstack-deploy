@@ -8,3 +8,9 @@ node 'control.localdomain' {
   include ::osdeploy::adminnetwork
   include ::osdeploy::control
 }
+
+node 'network.localdomain' {
+  include ::ntp
+  include ::osdeploy::networknetwork
+  include ::osdeploy::networknode
+}

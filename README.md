@@ -1321,6 +1321,102 @@ user has been created.
 
 # Chapter 5 Network Node: Quantum/Neutron
 
+# 5.1 Network Node Setup
+
+It's time to add another node to the configuration. Edit the nodes.pp file to add the new node.
+
+```
+node 'puppet' {
+  include ::ntp
+  include ::master
+}
+
+node 'control.localdomain' {
+  include ::ntp
+  include ::osdeploy::adminnetwork
+  include ::osdeploy::control
+}
+
+node 'network.localdomain' {
+  include ::ntp
+  include ::osdeploy::networknetwork
+  include ::osdeploy::networknode
+}
+```
+
+Set up the network configuration for the network node in the `oscontrol/manifests/networknetwork.pp' file:
+
+```
+class osdeploy::networknetwork {
+
+  exec { 'restart eth1':
+    command     => '/sbin/ifdown eth1; /sbin/ifup eth1',
+  } 
+
+  network_config { 'eth1':
+    ensure      => present,
+    family      => 'inet',
+    ipaddress   => '172.16.211.11',
+    method      => 'static',
+    onboot      => 'true',
+    reconfigure => 'true',
+    notify      => Exec['restart eth1'],
+  }
+
+  exec { 'restart eth3':
+    command     => '/sbin/ifdown eth3; /sbin/ifup eth3',
+  } 
+
+  network_config { 'eth3':
+    ensure      => present,
+    family      => 'inet',
+    ipaddress   => '192.168.85.11',
+    method      => 'static',
+    onboot      => 'true',
+    reconfigure => 'true',
+    notify      => Exec['restart eth3'],
+  }
+
+}
+```
+
+Create the network base class file, `osdeploy/manifests/control.pp`:
+
+```
+class osdeploy::networknode {
+}
+``` 
+
+
+Kick off a puppet run on the network node, sign the cert on the master node, then make 
+another run on the network node.
+
+```
+[root@network ~]# puppet agent -t
+Info: Creating a new SSL key for network.localdomain
+Info: Caching certificate for ca
+Info: Creating a new SSL certificate request for network.localdomain
+Info: Certificate Request fingerprint (SHA256): 4D:8C:49:AC:62:81:1E:D1:A4:F6:9C:6A:BD:80:D3:30:DB:68:E2:EB:B1:C2:A0:AC:E6:65:C0:97:31:21:AC:D4
+Exiting; no certificate found and waitforcert is disabled
+```
+
+```
+[root@puppet puppet]# puppet cert --list
+"network.localdomain" (SHA256) 4D:8C:49:AC:62:81:1E:D1:A4:F6:9C:6A:BD:80:D3:30:DB:68:E2:EB:B1:C2:A0:AC:E6:65:C0:97:31:21:AC:D4
+[root@puppet puppet]# puppet cert --sign network.localdomain
+Notice: Signed certificate request for network.localdomain
+Notice: Removing file Puppet::SSL::CertificateRequest network.localdomain at '/var/lib/puppet/ssl/ca/requests/network.localdomain.pem'
+```
+
+```
+puppet agent -t
+...
+```
+
+Now that the foundations are set up for the node, we're ready to configure the Quantum/Neutron network service
+
+## 5.2 Configuring the Quantum/Neutron services
+
 # Chapter 6 Nova API and Scheduler
 
 # Chapter 7 Compute Node: Nova Compute and Quantum Agents
