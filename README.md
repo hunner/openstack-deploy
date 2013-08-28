@@ -715,6 +715,8 @@ your setup database should be complete.
 Every other OpenStack project depends upon the Keystone as both an identity service
 and a service catalog for all of the OpenStack system.
 
+## 3.1 Deplying the Keystone services
+
 There are several parts of Keystone that need to be deployed. We'll start by 
 creating a `keystone.pp` file to contain the keystone deployment. Start
 with a class, with several parameters to control the particulars of our
@@ -992,6 +994,122 @@ generated on the controller node. You can get a sense of what puppet configured 
 the modules, and the possibilities of how you can change the configuration to enable 
 other features.
 
+## 3.2 Adding test tenants and users
+
+The puppet-keystone module offers keystone user and tenant types and providers to help manage users
+with puppet. We'll add some functionality to allow us to define new users with Heira that will
+then automatically be generated for Keystone.
+
+Start by defining a new resource that will create users, `create_user.pp`:
+
+```
+define osdeploy::create_user (
+  $password,
+  $tenant,
+  $email) {
+    keystone_user { "$name":
+      ensure   => present,
+      enabled  => "True",
+      password => "$password",
+      tenant   => "$tenant",
+      email    => "$email",
+    }
+
+    keystone_user_role { "$name@$tenant":
+      roles  => ['Member'],
+      ensure => present,
+    }
+}
+```
+
+In addition to its name, this resource requires a password, tenant, and an e-mail for the user.
+It then creates the `keystone_user` type and ensures that its created. Although tenant assignment
+is implied by the creation of the user, an explicit assignment to a tenant is created using the
+`keystone_user_role` type. Note that this simple implementation limits a user to one tenancy. In 
+the OpenStack world, you can assign users to new tenants by assigning a role to a user for a tenant. 
+You could easily extent this model to allow multi-tenancy with a new `assign_user_tenant` resource.
+
+This helper function is then applied using an `osdeploy::users` class in `users.pp`:
+
+```
+class osdeploy::users {
+  $users = hiera(users)
+  create_resources("osdeploy::create_user", $users)
+}
+```
+
+The `create_resources` function will iterator over a users hash loaded from the hiera database,
+creating a new resource for every entry. Add the user definition to the `hieradata/common.yaml`
+file:
+
+```
+users:
+    "test":
+        password: "abc123"
+        tenant: "test"
+        email: "test@example.com"
+```
+
+Run your configuration on the control node. Check for the existence of the new users and tenants.
+
+```
+[root@control ~]# puppet resource keystone_user
+keystone_user { 'admin':
+  ensure  => 'present',
+  email   => 'chris.hoge@puppetlabs.com',
+  enabled => 'True',
+  id      => '4a34807e3a6241e2becf66cf5e530d80',
+  tenant  => 'admin',
+}
+keystone_user { 'glance':
+  ensure  => 'present',
+  email   => 'glance@localhost',
+  enabled => 'True',
+  id      => '90b79f61f9e04330aa5d89103f140556',
+  tenant  => 'services',
+}
+keystone_user { 'test':
+  ensure  => 'present',
+  email   => 'test@example.com',
+  enabled => 'True',
+  id      => '82c4952cbad5420db7213c62bb70b869',
+  tenant  => 'test',
+}
+[root@control ~]# puppet resource keystone_tenant
+keystone_tenant { 'admin':
+  ensure      => 'present',
+  description => 'admin tenant',
+  enabled     => 'True',
+  id          => 'a5ee76117fc947ed8a2438ca702888ce',
+}
+keystone_tenant { 'services':
+  ensure      => 'present',
+  description => 'Tenant for the openstack services',
+  enabled     => 'True',
+  id          => 'd360da8ed5cc4691bc5e8a58ebfdf844',
+}
+keystone_tenant { 'test':
+  ensure  => 'present',
+  enabled => 'True',
+  id      => '2d2fe5c9d8b04e9fb70ef7127a2c8422',
+}
+[root@control ~]# puppet resource keystone_user_role
+keystone_user_role { 'admin@admin':
+  ensure => 'present',
+  roles  => ['admin'],
+}
+keystone_user_role { 'glance@services':
+  ensure => 'present',
+  roles  => ['admin'],
+}
+keystone_user_role { 'test@test':
+  ensure => 'present',
+  roles  => ['Member'],
+}
+```
+
+##
+
 # Chapter 4: Glance
 
 Now we'll move on to installing Glance on the controller node. For this deployment
@@ -1000,8 +1118,181 @@ want to use a more robust image storage backend, such as Swift (which gives
 you large object storage with redundancy across availablity zones) or Ceph (which
 give you redundant block and object storage).
 
-The configuration file for Glance is similar to Keystone:
+The configuration file for Glance is similar to Keystone. Here's the file, section-by-section. First, the
+class parameters to specify the network settings and passwords.
 
 ```
+class osdeploy::glance (
+  $glance_user_password,
+  $glance_public_address = '127.0.0.1',
+  $glance_admin_address = '127.0.0.1',
+  $glance_internal_address = '127.0.0.1',
+  $glance_public_network = '0.0.0.0',
+  $glance_private_network = '0.0.0.0',
+  $region = 'openstack',
+  $glance_db_host = 'localhost',
+  $glance_db_user = 'glance',
+  $glance_db_password = 'glance-password',
+  $glance_db_name = 'glance',
+  $glance_db_allowed_hosts = false 
+) {
+```
+
+Next, the firewall setup to open the private and public APIs up.
 
 ```
+  # public API access
+  firewall { '09292 - Glance Public':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '9292',
+    source => $glance_public_network,
+  }
+
+  # admin API access
+  firewall { '09191 - Glance Private':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '9191',
+    source => $glance_private_network,
+  }
+```
+
+The database is configured.
+
+```
+  # database setup
+  $glance_sql_connection = "mysql://$glance_db_user:$glance_db_password@$glance_db_host/$glance_db_name"
+  class { 'glance::db::mysql':
+    user          => $glance_db_user,
+    password      => $glance_db_password,
+    dbname        => $glance_db_name,
+    allowed_hosts => $glance_db_allowed_hosts,
+  } 
+```
+
+The Glance endpoints and admin user are created.
+
+```
+  # Keystone setup for Glance. Creates glance admin user and creates catalog settings
+  # sets the glance user to be 'glance', tenant 'services'
+  class  { 'glance::keystone::auth':
+    password         => $glance_user_password,
+    public_address   => $glance_public_address,
+    admin_address    => $glance_admin_address,
+    internal_address => $glance_internal_address,
+    region           => $region,
+  }
+```
+
+The api and registry services are initialized.
+
+```
+  # Note that the api node and registry node both reside on the controller
+  # It's reasonable that all API functions could be separated from other
+  # backend functions
+
+  # The api server depends on the registry, so install the registry first
+  class { 'glance::api':
+    keystone_password => $glance_user_password,
+    auth_host         => $keystone_admin_endpoint,
+    keystone_tenant   => 'services',
+    keystone_user     => 'glance',
+    sql_connection    => $glance_sql_connection,
+  }
+
+  class { 'glance::registry':
+    keystone_password => $glance_user_password,
+    sql_connection    => $glance_sql_connection,
+    auth_host         => $keystone_admin_endpoint,
+    keystone_tenant   => 'services',
+    keystone_user     => 'glance',
+  } 
+```
+
+This deployment uses the local file backend. Other available options include Ceph
+and Swift.
+
+```
+  class { 'glance::backend::file': }
+}
+```
+
+The `heiradata/common.yaml` file needs to be updated for glance
+
+```
+nova::rabbitmq::password: 'xyme-mita'
+osdeploy::db::mysql_root_password: 'fi-de-hi'
+osdeploy::db::bind_address: '172.16.211.10'
+
+osdeploy::keystone::keystone_admin_token: 'pala-vif'
+osdeploy::keystone::admin_email: 'chris.hoge@puppetlabs.com'
+osdeploy::keystone::admin_pass: 'quu-rhyw'
+osdeploy::keystone::keystone_public_address: '192.168.85.10'
+osdeploy::keystone::keystone_admin_address: '172.16.211.10'
+osdeploy::keystone::keystone_internal_address: '192.168.85.10'
+osdeploy::keystone::keystone_public_network: '192.168.85.0/24'
+osdeploy::keystone::keystone_private_network: '172.16.211.0/24'
+osdeploy::keystone::keystone_db_password: 'rhof-nibs'
+osdeploy::keystone::keystone_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
+
+osdeploy::glance::glance_user_password: 'quu-rhyw'
+osdeploy::glance::glance_public_address: '192.168.85.10'
+osdeploy::glance::glance_admin_address: '172.16.211.10'
+osdeploy::glance::glance_internal_address: '192.168.85.10'
+osdeploy::glance::glance_public_network: '192.168.85.0/24'
+osdeploy::glance::glance_private_network: '172.16.211.0/24'
+osdeploy::glance::glance_db_password: 'rhof-nibs'
+osdeploy::glance::glance_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
+```
+
+Add the class to the control configuration
+
+```
+class osdeploy::control {
+  class { 'osdeploy::common': } ->
+  class { 'osdeploy::firewall::pre': } ->
+  class { 'osdeploy::db': } ->
+  class { 'memcached':
+      listen_ip => '127.0.0.1',
+      tcp_port  => '11211',
+      udp_port  => '11211',
+  } ->
+  class { 'nova::rabbitmq': } ->
+  class { 'osdeploy::keystone': } ->
+  class { 'osdeploy::glance': } ->
+  class { 'osdeploy::firewall::post': } 
+}
+```
+
+Apply the configuration to your control environment. Check that the services are running on the
+correct ports, 9191 for the administrative API, 9292 for the public API:
+
+```
+curl http://192.168.85.10:9191
+curl: (7) couldn't connect to host
+
+curl http://192.168.85.10:9292
+{"versions": [{"status": "CURRENT", "id": "v2.1", "links": [{"href": "http://192.168.85.10:9292/v2/", "rel": "self"}]}, {"status": "SUPPORTED", "id": "v2.0", "links": [{"href": "http://192.168.85.10:9292/v2/", "rel": "self"}]}, {"status": "CURRENT", "id": "v1.1", "links": [{"href": "http://192.168.85.10:9292/v1/", "rel": "self"}]}, {"status": "SUPPORTED", "id": "v1.0", "links": [{"href": "http://192.168.85.10:9292/v1/", "rel": "self"}]}]}
+
+curl http://172.16.211.10:9292
+curl: (7) couldn't connect to host
+
+curl http://172.16.211.10:9191
+<html>
+ <head>
+  <title>401 Unauthorized</title>
+ </head>
+ <body>
+  <h1>401 Unauthorized</h1>
+  This server could not verify that you are authorized to access the document you requested. Either you supplied the wrong credentials (e.g., bad password), or your browser does not understand how to supply the credentials required.<br /><br />
+Authentication required
+
+
+ </body>
+</html>
+```
+
+

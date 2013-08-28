@@ -21,3 +21,10 @@ osdeploy::glance::glance_public_network: '192.168.85.0/24'
 osdeploy::glance::glance_private_network: '172.16.211.0/24'
 osdeploy::glance::glance_db_password: 'rhof-nibs'
 osdeploy::glance::glance_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
+
+users:
+    "test":
+        password: "abc123"
+        tenant: "test"
+        email: "test@example.com"
+
