@@ -1470,7 +1470,7 @@ class osdeploy::networkauth (
 ```
 
 Add the database and auth configuration to the controller node, 
-```osdeploy/manifests/control.pp```
+`osdeploy/manifests/control.pp`:
 
 ```
 class osdeploy::control {
