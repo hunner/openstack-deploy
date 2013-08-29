@@ -1415,15 +1415,13 @@ puppet agent -t
 ...
 ```
 
-
-
 After a success application, you'll need to reboot the node. The RDO repository
 includes a patched kernel and module to support network namespaces in OpenVSwitch.
 
 Now that the foundations are set up for the node, we're ready to configure the 
 Quantum/Neutron network service
 
-## 5.2 Configuring the Quantum/Neutron database
+## 5.2 Configuring the Quantum/Neutron database and Keystone data
 
 The database for the Quantum/Neutron service needs to be installed on the controller
 node. This configuration is slightly different, and is going to introduce
@@ -1458,9 +1456,35 @@ Add the db configuration to your hiera database, `hieradata/common.yaml`.
 osdeploy::networkdb::network_db_password: 'rhof-nibs'
 osdeploy::networkdb::network_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
 
+osdeploy::networkauth::network_user_password: 
+osdeploy::networkauth::network_public_address: '192.168.85.11'
+osdeploy::networkauth::network_admin_address: '172.16.211.11'
+osdeploy::networkauth::network_internal_address: '192.168.85.11'
 ```
 
-Add the database configuration to the controller node, osdeploy/manifests/control.pp
+Create a class to create the network user and catalog endpoints for Keystone,
+`osdeploy/manifests/networkauth.pp`
+
+```
+class osdeploy::networkauth (
+  $network_user_password = '127.0.0.1',
+  $network_public_address = '127.0.0.1',
+  $network_admin_address = '127.0.0.1',
+  $network_internal_address = '127.0.0.1',
+  $region = 'openstack',
+) {
+  class { 'quantum::keystone::auth':
+    password         => $network_user_password,
+    public_address   => $network_public_address,
+    admin_address    => $network_admin_address,
+    internal_address => $network_internal_address,
+    region           => $region,
+  }
+}
+```
+
+Add the database and auth configuration to the controller node, 
+```osdeploy/manifests/control.pp```
 
 ```
 class osdeploy::control {
@@ -1477,6 +1501,7 @@ class osdeploy::control {
   class { 'osdeploy::users':} ->
   class { 'osdeploy::glance': } ->
   class { 'osdeploy::networkdb': } ->
+  class { 'osdeploy::networkauth': } ->
   class { 'osdeploy::firewall::post': } 
 }
 ```
@@ -1485,6 +1510,7 @@ Run the configuration on the controller node. Now that the database is installed
 the network node configuration can be completed.
 
 ## 5.3 Configuring the Quantum/Neutron services
+
 
 # Chapter 6 Nova API and Scheduler
 

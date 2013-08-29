@@ -1,4 +1,4 @@
-nova::rabbitmq::password: 'xyme-mita'
+nova::rabbitmq::password: 'xyme-mita1'
 osdeploy::db::mysql_root_password: 'fi-de-hi'
 osdeploy::db::bind_address: '172.16.211.10'
 
@@ -31,4 +31,18 @@ users:
 osdeploy::networkdb::network_db_password: 'rhof-nibs'
 osdeploy::networkdb::network_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
 
+osdeploy::networkauth::network_user_password: 'waqu-zub'
+osdeploy::networkauth::network_public_address: '192.168.85.11'
+osdeploy::networkauth::network_admin_address: '172.16.211.11'
+osdeploy::networkauth::network_internal_address: '192.168.85.11'
 
+osdeploy::networkservice::network_user_password: 'waqu-zub'
+osdeploy::networkservice::network_auth_host: '172.16.211.10'
+osdeploy::networkservice::network_public_address: '192.168.85.11'
+osdeploy::networkservice::network_admin_address: '172.16.211.11'
+osdeploy::networkservice::network_internal_address: '192.168.85.11'
+osdeploy::networkservice::network_db_host: '172.16.211.10'
+osdeploy::networkservice::network_db_password: 'rhof-nibs'
+osdeploy::networkservice::network_db_name: 'network'
+osdeploy::networkservice::rabbit_host: '172.16.211.10'
+osdeploy::networkservice::rabbit_password: 'xyme-mita'
