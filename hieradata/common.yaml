@@ -1,4 +1,3 @@
-nova::rabbitmq::password: 'xyme-mita1'
 osdeploy::db::mysql_root_password: 'fi-de-hi'
 osdeploy::db::bind_address: '172.16.211.10'
 
@@ -45,4 +44,3 @@ osdeploy::networkservice::network_db_host: '172.16.211.10'
 osdeploy::networkservice::network_db_password: 'rhof-nibs'
 osdeploy::networkservice::network_db_name: 'network'
 osdeploy::networkservice::rabbit_host: '172.16.211.10'
-osdeploy::networkservice::rabbit_password: 'xyme-mita'

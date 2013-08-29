@@ -12,5 +12,6 @@ class osdeploy::control {
   class { 'osdeploy::users':} ->
   class { 'osdeploy::glance': } ->
   class { 'osdeploy::networkdb': } ->
+  class { 'osdeploy::networkauth': } ->
   class { 'osdeploy::firewall::post': } 
 }

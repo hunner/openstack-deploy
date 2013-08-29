@@ -509,17 +509,6 @@ Begin by creating an `/etc/puppet/hiera.yaml` configuration file.
   - common
 ```
 
-Next, populate the custom database with the entry for the RabbitMQ parameter. The file is
-`/etc/puppet/hieradata/common.yaml`
-
-```
-nova::rabbitmq::password: 'xyme-mita'
-```
-
-If you look at the nova module, you'll see in the rabbitmq.pp file that the parameter `password`
-to the class `nova::rabbitmq` defaults to `guest`. The hiera entry overrides this default
-parameter.
-
 Now add the `nova:rabbitmq` class to the `control.pp` file:
 
 ```
@@ -676,7 +665,6 @@ class osdeploy::db (
 The database root password and bind address should be set in your hiera database.
 
 ```
-nova::rabbitmq::password: 'xyme-mita'
 osdeploy::db::mysql_root_password: 'fi-de-hi'
 osdeploy::db::bind_address: '172.16.211.10'
 ```
@@ -938,7 +926,6 @@ To make this configuration work for your environment, configure
 the hiera database in `heiradata/common.yaml` to have your custom variables.
 
 ```
-nova::rabbitmq::password: 'xyme-mita'
 osdeploy::db::mysql_root_password: 'fi-de-hi'
 osdeploy::db::bind_address: '172.16.211.10'
 
@@ -1235,7 +1222,6 @@ and Swift.
 The `heiradata/common.yaml` file needs to be updated for glance
 
 ```
-nova::rabbitmq::password: 'xyme-mita'
 osdeploy::db::mysql_root_password: 'fi-de-hi'
 osdeploy::db::bind_address: '172.16.211.10'
 
@@ -1511,6 +1497,95 @@ the network node configuration can be completed.
 
 ## 5.3 Configuring the Quantum/Neutron services
 
+The setup for the Quantum service on its own node is a little bit more complex.
+Begin with the signature for the `osdeploy::networkservice` class, which 
+is similar to the glance and keystone classes preceeding it.
+
+```
+class osdeploy::networkservice (
+  $network_user_password,
+  $network_auth_host,
+  $network_public_address = '127.0.0.1',
+  $network_admin_address = '127.0.0.1',
+  $network_internal_address = '127.0.0.1',
+  $region = 'openstack',
+  $network_db_host = 'localhost',
+  $network_db_user = 'network',
+  $network_db_password = 'network-password',
+  $network_db_name = 'network',
+  $rabbit_host = 'localhost',
+  $rabbit_password = 'guest',
+) {
+```
+
+The connectors to the control node, where the RabbitMQ scheduler and the database
+reside are configured. The quantum class also pulls in all of the packages
+necessary to install quantum, except for the keystone client which is 
+installed explicitly.
+
+```
+  $sql_connection = "mysql://${network_db_user}:${network_db_password}@${network_db_host}/${network_db_name}?charset=utf8"
+
+  class {'::quantum':
+    rabbit_host     => $rabbit_host,
+    rabbit_password => $rabbit_password,
+    verbose         => 'True',
+    debug           => 'True',
+  }
+
+  class { 'keystone::client': } ->
+```
+
+The server is now set up, pointing it to the keystone service. By default
+quantum uses the Open VSwitch driver, `ovs`.
+
+```
+  class {'quantum::server':
+    auth_host     => $network_auth_host,
+    auth_password => $network_user_password,
+  }
+```
+
+The ovs plugin needs to be configured. It is given the sql connection string,
+and configures the tunnel type. By default the modules will run on a vlan
+tunnel, but it's simpler to set up the Generalized Routing Encapsulation (gre) 
+tunnel that ovs provides.
+
+```
+  class {'quantum::plugins::ovs':
+    sql_connection      => $sql_connection,
+    tenant_network_type => 'gre',
+  }
+```
+
+Finally, the quantum network agent is configured to run on the server, with the
+specified internal network address.
+
+```
+  class {'quantum::agents::ovs':
+    enable_tunneling => 'True',
+    local_ip         => $network_internal_address,
+  }
+}
+```
+
+Add the file to the `networknode.pp` file.
+
+```
+class osdeploy::networknode {
+  class { 'osdeploy::common':}
+  class { 'osdeploy::networkservice': }
+}
+``` 
+
+Apply the configuration to the network node. You can check the configuration on the
+network node by running the command:
+
+```
+quantum  --os-username test --os-password abc123 --os-tenant-name test --os-auth-url http://192.168.85.10:5000/v2.0 net-list
+```
+
+This should return an empty string with no error.
 
 # Chapter 6 Nova API and Scheduler
 
