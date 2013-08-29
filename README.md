@@ -1380,10 +1380,12 @@ class osdeploy::networknetwork {
 }
 ```
 
-Create the network base class file, `osdeploy/manifests/control.pp`:
+Create the network base class file, `osdeploy/manifests/control.pp`, to deploy
+the common packages for OpenStack.
 
 ```
 class osdeploy::networknode {
+    class { 'osdeploy::common': }
 }
 ``` 
 
@@ -1413,9 +1415,76 @@ puppet agent -t
 ...
 ```
 
-Now that the foundations are set up for the node, we're ready to configure the Quantum/Neutron network service
 
-## 5.2 Configuring the Quantum/Neutron services
+
+After a success application, you'll need to reboot the node. The RDO repository
+includes a patched kernel and module to support network namespaces in OpenVSwitch.
+
+Now that the foundations are set up for the node, we're ready to configure the 
+Quantum/Neutron network service
+
+## 5.2 Configuring the Quantum/Neutron database
+
+The database for the Quantum/Neutron service needs to be installed on the controller
+node. This configuration is slightly different, and is going to introduce
+some redundancy into our hiera database. The db service is going to reside
+on a different node than the controller service.
+
+Create a file `osdeploy/manifests/networkdb.pp`.
+
+```
+class osdeploy::networkdb(
+  $network_db_user = 'network',
+  $network_db_password = 'network-password',
+  $network_db_name = 'network',
+  $network_db_allowed_hosts = false 
+)
+{
+  # database setup
+  $network_sql_connection = "mysql://$network_db_user:$network_db_password@$network_db_host/$network_db_name"
+  class { 'quantum::db::mysql':
+    user          => $network_db_user,
+    password      => $network_db_password,
+    dbname        => $network_db_name,
+    allowed_hosts => $network_db_allowed_hosts,
+  } 
+
+}
+```
+
+Add the db configuration to your hiera database, `hieradata/common.yaml`.
+
+```
+osdeploy::networkdb::network_db_password: 'rhof-nibs'
+osdeploy::networkdb::network_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
+
+```
+
+Add the database configuration to the controller node, osdeploy/manifests/control.pp
+
+```
+class osdeploy::control {
+  class { 'osdeploy::common': } ->
+  class { 'osdeploy::firewall::pre': } ->
+  class { 'osdeploy::db': } ->
+  class { 'memcached':
+      listen_ip => '127.0.0.1',
+      tcp_port  => '11211',
+      udp_port  => '11211',
+  } ->
+  class { 'nova::rabbitmq': } ->
+  class { 'osdeploy::keystone': } ->
+  class { 'osdeploy::users':} ->
+  class { 'osdeploy::glance': } ->
+  class { 'osdeploy::networkdb': } ->
+  class { 'osdeploy::firewall::post': } 
+}
+```
+
+Run the configuration on the controller node. Now that the database is installed
+the network node configuration can be completed.
+
+## 5.3 Configuring the Quantum/Neutron services
 
 # Chapter 6 Nova API and Scheduler
 

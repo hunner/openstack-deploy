@@ -28,3 +28,7 @@ users:
         tenant: "test"
         email: "test@example.com"
 
+osdeploy::networkdb::network_db_password: 'rhof-nibs'
+osdeploy::networkdb::network_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
+
+

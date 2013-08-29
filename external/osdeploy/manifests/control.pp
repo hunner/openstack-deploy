@@ -11,5 +11,6 @@ class osdeploy::control {
   class { 'osdeploy::keystone': } ->
   class { 'osdeploy::users':} ->
   class { 'osdeploy::glance': } ->
+  class { 'osdeploy::networkdb': } ->
   class { 'osdeploy::firewall::post': } 
 }
