@@ -1791,6 +1791,27 @@ class osdeploy::control {
 }
 ```
 
+Update the parameters in the hiera database.
+
+```
+osdeploy::novacontrol::nova_user_password: 'fy-by-ka'
+osdeploy::novacontrol::quantum_user_password: 'waqu-zub'
+osdeploy::novacontrol::nova_db_password: 'rhof-nibs'
+osdeploy::novacontrol::nova_db_host: '172.16.211.10'
+osdeploy::novacontrol::nova_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
+osdeploy::novacontrol::nova_public_address: '192.168.85.10'
+osdeploy::novacontrol::nova_admin_address: '172.16.211.10'
+osdeploy::novacontrol::nova_internal_address: '192.168.85.10'
+osdeploy::novacontrol::nova_public_network: '192.168.85.0/24'
+osdeploy::novacontrol::nova_private_network: '172.16.211.0/24'
+osdeploy::novacontrol::nova_auth_host: '172.16.211.10'
+osdeploy::novacontrol::vnc_proxy_host: '192.168.85.10'
+osdeploy::novacontrol::rabbit_host: ['172.16.211.10']
+osdeploy::novacontrol::glance_api_server: 'http://192.168.85.10:9292'
+osdeploy::novacontrol::keystone_admin_url: 'http://172.16.211.10:35357/v2.0'
+osdeploy::novacontrol::quantum_url: 'http://172.16.211.11:9696'
+```
+
 Apply the configuration to the controller node.
 
 TODO test configuration
