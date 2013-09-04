@@ -22,10 +22,10 @@ osdeploy::glance::glance_db_password: 'rhof-nibs'
 osdeploy::glance::glance_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
 
 users:
-    "test":
-        password: "abc123"
-        tenant: "test"
-        email: "test@example.com"
+"test":
+password: "abc123"
+tenant: "test"
+email: "test@example.com"
 
 osdeploy::networkdb::network_db_password: 'rhof-nibs'
 osdeploy::networkdb::network_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
@@ -75,3 +75,18 @@ osdeploy::cindercontrol::cinder_db_password: 'rhof-nibs'
 osdeploy::cindercontrol::cinder_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
 osdeploy::cindercontrol::rabbit_host: ['172.16.211.10']
 osdeploy::cindercontrol::cinder_auth_host: '172.16.211.10'
+
+osdeploy::novacompute::ovs_local_ip: '172.16.211.12'
+osdeploy::novacompute::internal_address: '172.16.211.12'
+osdeploy::novacompute::quantum_user_password: 'waqu-zub'
+osdeploy::novacompute::nova_db_password: 'rhof-nibs'
+osdeploy::novacompute::nova_db_host: '172.16.211.10'
+osdeploy::novacompute::nova_db_name: 'nova'
+osdeploy::novacompute::rabbit_user: 'guest'
+osdeploy::novacompute::rabbit_password: 'guest'
+osdeploy::novacompute::rabbit_host: '172.16.211.10'
+osdeploy::novacompute::glance_api_servers: 'http://192.168.85.10:9292'
+osdeploy::novacompute::vncproxy_host: '172.16.211.10'
+osdeploy::novacompute::keystone_host: '172.16.211.10'
+osdeploy::novacompute::quantum_host: '172.16.211.11'
+
