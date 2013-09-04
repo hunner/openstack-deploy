@@ -1518,14 +1518,37 @@ class osdeploy::networkservice (
 ) {
 ```
 
+The sql connection string needs to be constructed, and the firewall opened up to allow connections
+to the quantum service.
+
+```
+  $sql_connection = "mysql://${network_db_user}:${network_db_password}@${network_db_host}/${network_db_name}?charset=utf8"
+
+  # public API access
+  firewall { '09696 - Quantum API Public':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '9696',
+    source => $network_public_network,
+  } 
+
+  # private API access
+  firewall { '09696 - Quantum API Private':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '9696',
+    source => $network_private_network,
+  } 
+```
+
 The connectors to the control node, where the RabbitMQ scheduler and the database
 reside are configured. The quantum class also pulls in all of the packages
 necessary to install quantum, except for the keystone client which is 
 installed explicitly.
 
 ```
-  $sql_connection = "mysql://${network_db_user}:${network_db_password}@${network_db_host}/${network_db_name}?charset=utf8"
-
   class {'::quantum':
     rabbit_host     => $rabbit_host,
     rabbit_password => $rabbit_password,
