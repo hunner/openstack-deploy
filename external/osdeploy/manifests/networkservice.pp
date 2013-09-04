@@ -4,6 +4,8 @@ class osdeploy::networkservice (
   $network_public_address = '127.0.0.1',
   $network_admin_address = '127.0.0.1',
   $network_internal_address = '127.0.0.1',
+  $network_public_network = '0.0.0.0',
+  $network_private_network = '0.0.0.0',
   $region = 'openstack',
   $network_db_host = 'localhost',
   $network_db_user = 'network',
@@ -15,6 +17,24 @@ class osdeploy::networkservice (
 
 
   $sql_connection = "mysql://${network_db_user}:${network_db_password}@${network_db_host}/${network_db_name}?charset=utf8"
+
+  # public API access
+  firewall { '09696 - Quantum API Public':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '9696',
+    source => $network_public_network,
+  } 
+
+  # private API access
+  firewall { '09696 - Quantum API Private':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '9696',
+    source => $network_private_network,
+  } 
 
   class {'::quantum':
     rabbit_host     => $rabbit_host,
