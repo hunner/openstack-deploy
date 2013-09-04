@@ -1973,6 +1973,105 @@ TODO test configuration
 
 # Chapter 8 Compute Node: Nova Compute, Cinder Volume, Quantum Agent
 
+The compute node, hosting the nova-compute, cinder-volume, and quantum-agent
+needs to be configures.
+
+## 8.1 Setting up the node.
+
+Create a new class, `osdeploy::computenode` that will host the configuration for the compute node.
+
+```
+class osdeploy::computenode {
+  class { 'osdeploy::common': }
+}
+```
+
+Also create a network configuration for the compute node, `osdeploy::computenetwork`.
+
+```
+class osdeploy::computenetwork {
+  exec { 'restart eth1':
+    command     => '/sbin/ifdown eth1; /sbin/ifup eth1',
+  } 
+
+  network_config { 'eth1':
+    ensure      => present,
+    family      => 'inet',
+    ipaddress   => '172.16.211.12',
+    method      => 'static',
+    onboot      => 'true',
+    reconfigure => 'true',
+    notify      => Exec['restart eth1'],
+  }
+
+  exec { 'restart eth3':
+    command     => '/sbin/ifdown eth3; /sbin/ifup eth3',
+  } 
+
+  network_config { 'eth3':
+    ensure      => present,
+    family      => 'inet',
+    ipaddress   => '192.168.85.12',
+    method      => 'static',
+    onboot      => 'true',
+    reconfigure => 'true',
+    notify      => Exec['restart eth3'],
+  }
+}
+```
+
+Add the node type to the `nodes.pp` file.
+
+```
+node 'puppet' {
+  include ::ntp
+  include ::master
+}
+
+node 'control.localdomain' {
+  include ::ntp
+  include ::osdeploy::adminnetwork
+  include ::osdeploy::control
+}
+
+node 'network.localdomain' {
+  include ::ntp
+  include ::osdeploy::networknetwork
+  include ::osdeploy::networknode
+}
+
+node 'compute.localdomain' {
+  include ::ntp
+  include ::osdeploy::computenetwork
+  include ::osdeploy::computenode
+}
+```
+
+Connect the compute node to the master:
+
+```
+[root@compute ~]# puppet agent -t
+Info: Creating a new SSL key for compute.localdomain
+Info: Creating a new SSL certificate request for compute.localdomain
+Info: Certificate Request fingerprint (SHA256): 28:55:6A:0A:08:9F:0C:6E:F1:21:83:E1:2A:DE:F9:F6:20:46:F3:F1:57:CF:CD:FD:68:5F:6A:D8:42:A2:AE:1F
+Exiting; no certificate found and waitforcert is disabled
+```
+
+Sign the cert on the master:
+
+```
+[root@puppet puppet]# puppet cert --list
+"compute.localdomain" (SHA256) 28:55:6A:0A:08:9F:0C:6E:F1:21:83:E1:2A:DE:F9:F6:20:46:F3:F1:57:CF:CD:FD:68:5F:6A:D8:42:A2:AE:1F
+[root@puppet puppet]# puppet cert --sign compute.localdomain
+Notice: Signed certificate request for compute.localdomain
+Notice: Removing file Puppet::SSL::CertificateRequest compute.localdomain at '/var/lib/puppet/ssl/ca/requests/compute.localdomain.pem'
+```
+
+Run the agent on the compute node again and verify that the connections are ok.
+
+## 8.2 Installing Cinder Volume
+
+## 8.2 Installing Nova Compute and the Quantum Agent
 
 # Chapter 9 Horizon
 

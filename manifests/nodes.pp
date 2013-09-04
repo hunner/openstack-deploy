@@ -14,3 +14,9 @@ node 'network.localdomain' {
   include ::osdeploy::networknetwork
   include ::osdeploy::networknode
 }
+
+node 'compute.localdomain' {
+  include ::ntp
+  include ::osdeploy::computenetwork
+  include ::osdeploy::computenode
+}
