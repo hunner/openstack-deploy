@@ -13,5 +13,6 @@ class osdeploy::control {
   class { 'osdeploy::glance': } ->
   class { 'osdeploy::networkdb': } ->
   class { 'osdeploy::networkauth': } ->
+  class { 'osdeploy::novacontrol': } ->
   class { 'osdeploy::firewall::post': } 
 }
