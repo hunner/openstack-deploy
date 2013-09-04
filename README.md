@@ -2069,9 +2069,7 @@ Notice: Removing file Puppet::SSL::CertificateRequest compute.localdomain at '/v
 
 Run the agent on the compute node again and verify that the connections are ok.
 
-## 8.2 Installing Cinder Volume
-
-## 8.2 Installing Nova Compute and the Quantum Agent
+## 8.2 Installing Nova Compute, Cinder Volume, and the Quantum Agent
 
 # Chapter 9 Horizon
 
