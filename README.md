@@ -1612,6 +1612,161 @@ This should return an empty string with no error.
 
 # Chapter 6 Cinder: Controller API and Scheduler
 
+By now some patterns should be emerging. We set up the database, endpoints, and firewall for a service. Components
+with schedulers need access to RabbitMQ. Keeping that in mind, we set up the Cinder controller service, `cindercontrol.pp`.
+
+Begin with the familiar class interface.
+
+```
+class osdeploy::cindercontrol (
+  $cinder_user_password,
+  $cinder_public_address = '127.0.0.1',
+  $cinder_admin_address = '127.0.0.1',
+  $cinder_internal_address = '127.0.0.1',
+  $cinder_public_network = '0.0.0.0',
+  $cinder_private_network = '0.0.0.0',
+  $region = 'openstack',
+  $cinder_db_host = 'localhost',
+  $cinder_db_user = 'cinder',
+  $cinder_db_password = 'cinder-password',
+  $cinder_db_name = 'cinder',
+  $cinder_db_allowed_hosts = false,
+  $rabbit_host = ['127.0.0.1'],
+  $rabbit_password = 'guest',
+  $cinder_auth_host = '127.0.0.1',
+) {
+```
+
+Set up the database, keystone connectors, and firewall.
+
+```
+  $cinder_db_connection = "mysql://$cinder_db_user:$cinder_db_password@$cinder_db_host/$cinder_db_name"
+
+  class { 'cinder::db::mysql':
+    user          => $cinder_db_user,
+    password      => $cinder_db_password,
+    dbname        => $cinder_db_name,
+    allowed_hosts => $cinder_db_allowed_hosts,
+  }
+
+  class { 'cinder::keystone::auth':
+    password         => $cinder_user_password,
+    public_address   => $cinder_public_address,
+    admin_address    => $cinder_admin_address,
+    internal_address => $cinder_internal_address,
+    region           => $region,
+  } 
+
+  # public API access
+  firewall { '03260 - Cinder Public':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '3260',
+    source => $cinder_public_network,
+  }
+
+  # private API access
+  firewall { '03260 - Cinder Private':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '3260',
+    source => $cinder_private_network,
+  }
+
+  # admin API access
+  firewall { '08776 - Metadata Public':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '8776',
+    source => $cinder_public_network,
+  }
+
+  # admin API access
+  firewall { '08776 - Metadata Private':
+    proto  => 'tcp',
+    state  => ['NEW'],
+    action => 'accept',
+    port   => '8776',
+    source => $cinder_private_network,
+  }
+```
+
+The base cinder class.
+
+```
+  class { '::cinder':
+    sql_connection    => $cinder_db_connection,
+    rabbit_hosts      => $rabbit_host,
+    rabbit_userid     => $rabbit_user,
+    rabbit_password   => $rabbit_password,
+    debug             => true,
+    verbose           => true,
+  } 
+```
+
+The api service.
+
+```
+  class { '::cinder::api':
+    keystone_password  => $cinder_user_password,
+    keystone_auth_host => $cinder_auth_host,
+  } 
+```
+
+The scheduler, taking care to explicitly set the simple scheduler driver.
+
+```
+  class { '::cinder::scheduler':
+    scheduler_driver => 'cinder.scheduler.simple.SimpleScheduler',
+  }
+}
+```
+
+Update the `controller.pp` class.
+
+```
+class osdeploy::control {
+  class { 'osdeploy::common': } ->
+  class { 'osdeploy::firewall::pre': } ->
+  class { 'osdeploy::db': } ->
+  class { 'memcached':
+      listen_ip => '127.0.0.1',
+      tcp_port  => '11211',
+      udp_port  => '11211',
+  } ->
+  class { 'nova::rabbitmq': } ->
+  class { 'osdeploy::keystone': } ->
+  class { 'osdeploy::users':} ->
+  class { 'osdeploy::glance': } ->
+  class { 'osdeploy::networkdb': } ->
+  class { 'osdeploy::networkauth': } ->
+  class { 'osdeploy::cindercontrol': } ->
+  class { 'osdeploy::novacontrol': } ->
+  class { 'osdeploy::firewall::post': } 
+}
+```
+
+Update the settings in the `hieradata/common.yaml`
+
+```
+osdeploy::cindercontrol::cinder_user_password: 'fy-by-ka'
+osdeploy::cindercontrol::cinder_public_address: '192.168.85.10'
+osdeploy::cindercontrol::cinder_admin_address: '172.16.211.10'
+osdeploy::cindercontrol::cinder_internal_address: '192.168.85.10'
+osdeploy::cindercontrol::cinder_public_network: '192.168.85.0/24'
+osdeploy::cindercontrol::cinder_private_network: '172.16.211.0/24'
+osdeploy::cindercontrol::cinder_db_host: '172.16.211.10'
+osdeploy::cindercontrol::cinder_db_password: 'rhof-nibs'
+osdeploy::cindercontrol::cinder_db_allowed_hosts: ['localhost', '127.0.0.1', '172.16.211.%']
+osdeploy::cindercontrol::rabbit_host: ['172.16.211.10']
+osdeploy::cindercontrol::cinder_auth_host: '172.16.211.10'
+```
+
+Apply the configuration to the controller node.
+
 # Chapter 7 Nova API and Scheduler
 
 We now turn our attention back to the controller node, creating a class to install the nova api and scheduler services.
