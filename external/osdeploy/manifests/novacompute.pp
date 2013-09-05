@@ -1,26 +1,4 @@
-class osdeploy::novacompute (
-  $ovs_local_ip,
-  $internal_address,
-  $quantum_user_password,
-  $libvirt_type = 'kvm', # use 'qemu' for virtualized test environments
-  $nova_db_user = 'nova',
-  $nova_db_password = 'password',
-  $nova_db_host = '127.0.0.1',
-  $nova_db_name = 'nova',
-  $rabbit_user = 'guest',
-  $rabbit_password = 'guest',
-  $rabbit_host = '127.0.0.1',
-  $glance_api_servers = 'http://127.0.0.1:9292',
-  $vncproxy_host = '127.0.0.1',
-  $keystone_host = '127.0.0.1',
-  $quantum_host = '127.0.0.1',
-  $cinder_db_user = 'cinder',
-  $cinder_db_password = 'password',
-  $cinder_db_host = '127.0.0.1',
-  $cinder_db_name = 'cinder',
-) {
-
-  $nova_sql_connection = "mysql://{$nova_db_user}:${nova_db_password}@{nova_db_host}/{nova_db_name}"
+class osdeploy::novacompute inherits osdeploy {
 
   # base configuration for nova
   class { '::nova':
