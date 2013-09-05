@@ -14,6 +14,10 @@ class osdeploy::novacompute (
   $vncproxy_host = '127.0.0.1',
   $keystone_host = '127.0.0.1',
   $quantum_host = '127.0.0.1',
+  $cinder_db_user = 'cinder',
+  $cinder_db_password = 'password',
+  $cinder_db_host = '127.0.0.1',
+  $cinder_db_name = 'cinder',
 ) {
 
   $nova_sql_connection = "mysql://{$nova_db_user}:${nova_db_password}@{nova_db_host}/{nova_db_name}"
@@ -69,13 +73,15 @@ class osdeploy::novacompute (
   $cinder_sql_connection = "mysql://${cinder_db_user}:${cinder_db_password}@${cinder_db_host}/${cinder_db_name}"
 
   class { '::cinder':
-    sql_connection    => $cinder_db_connection,
+    sql_connection    => $cinder_sql_connection,
     rabbit_host       => $rabbit_host,
     rabbit_userid     => $rabbit_user,
     rabbit_password   => $rabbit_password,
     debug             => true,
     verbose           => true,
   } 
+
+  class { '::cinder::setup_test_volume': } ->
 
   class { '::cinder::volume':
     package_ensure => true,
@@ -85,4 +91,5 @@ class osdeploy::novacompute (
   class { '::cinder::volume::iscsi':
     iscsi_ip_address => $internal_address,
   }
+
 }

@@ -89,4 +89,6 @@ osdeploy::novacompute::glance_api_servers: 'http://192.168.85.10:9292'
 osdeploy::novacompute::vncproxy_host: '172.16.211.10'
 osdeploy::novacompute::keystone_host: '172.16.211.10'
 osdeploy::novacompute::quantum_host: '172.16.211.11'
+osdeploy::novacompute::cinder_db_host: '172.16.211.10'
+osdeploy::novacompute::cinder_db_password: 'rhof-nibs'
 

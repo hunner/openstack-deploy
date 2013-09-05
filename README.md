@@ -2071,5 +2071,179 @@ Run the agent on the compute node again and verify that the connections are ok.
 
 ## 8.2 Installing Nova Compute, Cinder Volume, and the Quantum Agent
 
+The compute, volume, and quantum services are all tied tightly together on the compute nodes. The `osdeploy::novacompute` class
+ties all of these services together. In this case, we're making an assumption that the compute nodes are also hosting
+the `cinder-volume` service. This may not be a good assumption for your own deployment.
+
+```
+class osdeploy::novacompute (
+  $ovs_local_ip,
+  $internal_address,
+  $quantum_user_password,
+  $libvirt_type = 'kvm', # use 'qemu' for virtualized test environments
+  $nova_db_user = 'nova',
+  $nova_db_password = 'password',
+  $nova_db_host = '127.0.0.1',
+  $nova_db_name = 'nova',
+  $rabbit_user = 'guest',
+  $rabbit_password = 'guest',
+  $rabbit_host = '127.0.0.1',
+  $glance_api_servers = 'http://127.0.0.1:9292',
+  $vncproxy_host = '127.0.0.1',
+  $keystone_host = '127.0.0.1',
+  $quantum_host = '127.0.0.1',
+  $cinder_db_user = 'cinder',
+  $cinder_db_password = 'password',
+  $cinder_db_host = '127.0.0.1',
+  $cinder_db_name = 'cinder',
+) {
+```
+
+The basic class for nova is configured, including the sql connection string.
+
+```
+  $nova_sql_connection = "mysql://{$nova_db_user}:${nova_db_password}@{nova_db_host}/{nova_db_name}"
+
+  # base configuration for nova
+  class { '::nova':
+    sql_connection     => $nova_sql_connection,
+    rabbit_userid      => $rabbit_user,
+    image_service      => 'nova.image.glance.GlanceImageService',
+    glance_api_servers => $glance_api_servers,
+    verbose            => true,
+    rabbit_host        => $rabbit_host,
+  }
+```
+
+Severl components for the nova-compute node need to be configured. The ceneral compute configuration,
+followed by the libvirt type. In our case we default to kvm, but if you're deploying onto
+test virtual machines that don't support passthrough of virtual machine extensions (i.e. virtualbox),
+you'll want to change the `$libvirt_type` to `qemu`.
+
+```
+  # set up nova-compute
+  class { '::nova::compute':
+    enabled                       => true,
+    vnc_enabled                   => true,
+    vncserver_proxyclient_address => $internal_address,
+    vncproxy_host                 => $vncproxy_host,
+  }
+
+  # configure libvirt
+  class { '::nova::compute::libvirt':
+    libvirt_type     => $libvirt_type,
+    vncserver_listen => $internal_address,
+  }
+```
+
+The quantum agent needs to be installed, and nova needs to be configured to use quantum
+as its networking model (rather than the deprecated `nova-network`).
+
+```
+  # configure quantum
+  class { '::quantum':
+    rabbit_host     => $rabbit_host,
+    rabbit_password => $rabbit_password,
+  }
+
+  class { '::quantum::agents::ovs':
+    enable_tunneling => true,
+    local_ip         => $internal_address,
+  }
+
+  class { '::nova::compute::quantum': }
+
+  class { '::nova::network::quantum':
+    quantum_admin_password    => $quantum_user_password,
+    quantum_auth_strategy     => 'keystone',
+    quantum_url               => "http://${quantum_host}:9696",
+    quantum_admin_username    => 'quantum',
+    quantum_admin_tenant_name => 'service',
+    quantum_admin_auth_url    => "http://${keystone_host}:35357/v2.0",
+  }
+```
+
+Finally, cinder is configured. In this module, we're automatically creating a local
+cinder storage volume using lvm.
+
+```
+  # configure cinder
+
+  $cinder_sql_connection = "mysql://${cinder_db_user}:${cinder_db_password}@${cinder_db_host}/${cinder_db_name}"
+
+  class { '::cinder':
+    sql_connection    => $cinder_sql_connection,
+    rabbit_host       => $rabbit_host,
+    rabbit_userid     => $rabbit_user,
+    rabbit_password   => $rabbit_password,
+    debug             => true,
+    verbose           => true,
+  } 
+
+  class { '::cinder::setup_test_volume': } ->
+
+  class { '::cinder::volume':
+    package_ensure => true,
+    enabled        => true,
+  }
+
+  class { '::cinder::volume::iscsi':
+    iscsi_ip_address => $internal_address,
+  }
+
+}
+```
+
+Add the following block to your `hieradata/common.yaml` file:
+
+```
+osdeploy::novacompute::ovs_local_ip: '172.16.211.12'
+osdeploy::novacompute::internal_address: '172.16.211.12'
+osdeploy::novacompute::quantum_user_password: 'waqu-zub'
+osdeploy::novacompute::nova_db_password: 'rhof-nibs'
+osdeploy::novacompute::nova_db_host: '172.16.211.10'
+osdeploy::novacompute::nova_db_name: 'nova'
+osdeploy::novacompute::rabbit_user: 'guest'
+osdeploy::novacompute::rabbit_password: 'guest'
+osdeploy::novacompute::rabbit_host: '172.16.211.10'
+osdeploy::novacompute::glance_api_servers: 'http://192.168.85.10:9292'
+osdeploy::novacompute::vncproxy_host: '172.16.211.10'
+osdeploy::novacompute::keystone_host: '172.16.211.10'
+osdeploy::novacompute::quantum_host: '172.16.211.11'
+osdeploy::novacompute::cinder_db_host: '172.16.211.10'
+osdeploy::novacompute::cinder_db_password: 'rhof-nibs'
+```
+
+Apply the configuration to your compute node. You can test the cinder deployment by
+creating a new volume.
+
+```
+[root@control ~]# cinder --os-username test --os-tenant-name test --os-password abc123  --os-auth-url http://192.168.85.10:5000/v2.0 create 1
++---------------------+--------------------------------------+
+|       Property      |                Value                 |
++---------------------+--------------------------------------+
+|     attachments     |                  []                  |
+|  availability_zone  |                 nova                 |
+|       bootable      |                false                 |
+|      created_at     |      2013-09-05T16:50:38.425366      |
+| display_description |                 None                 |
+|     display_name    |                 None                 |
+|          id         | 8dac701d-2af8-40a9-a74a-ead876af33e2 |
+|       metadata      |                  {}                  |
+|         size        |                  1                   |
+|     snapshot_id     |                 None                 |
+|     source_volid    |                 None                 |
+|        status       |               creating               |
+|     volume_type     |                 None                 |
++---------------------+--------------------------------------+
+[root@control ~]# cinder --os-username test --os-tenant-name test --os-password abc123  --os-auth-url http://192.168.85.10:5000/v2.0 list
++--------------------------------------+-----------+--------------+------+-------------+----------+-------------+
+|                  ID                  |   Status  | Display Name | Size | Volume Type | Bootable | Attached to |
++--------------------------------------+-----------+--------------+------+-------------+----------+-------------+
+| 8dac701d-2af8-40a9-a74a-ead876af33e2 | available |     None     |  1   |     None    |  false   |             |
++--------------------------------------+-----------+--------------+------+-------------+----------+-------------+
+[root@control ~]# cinder --os-username test --os-tenant-name test --os-password abc123  --os-auth-url http://192.168.85.10:5000/v2.0 delete 8dac701d-2af8-40a9-a74a-ead876af33e2
+```
+
 # Chapter 9 Horizon
 
